@@ -20,8 +20,6 @@ package org.apache.inlong.manager.service.sort.util;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import java.util.List;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.inlong.common.enums.DataTypeEnum;
@@ -42,6 +40,9 @@ import org.apache.inlong.sort.protocol.node.format.CsvFormat;
 import org.apache.inlong.sort.protocol.node.format.DebeziumJsonFormat;
 import org.apache.inlong.sort.protocol.node.format.Format;
 import org.apache.inlong.sort.protocol.node.format.JsonFormat;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Parse SourceResponse to ExtractNode which sort needed
@@ -85,14 +86,16 @@ public class ExtractNodeUtils {
         String userName = binlogSourceResponse.getUser();
         String password = binlogSourceResponse.getPassword();
         Integer port = binlogSourceResponse.getPort();
-        Integer serverId = binlogSourceResponse.getServerId();
+        Integer serverId = null;
+        if (binlogSourceResponse.getServerId() != null && binlogSourceResponse.getServerId() > 0) {
+            serverId = binlogSourceResponse.getServerId();
+        }
         String tables = binlogSourceResponse.getTableWhiteList();
         List<String> tableNames = Splitter.on(",").splitToList(tables);
         List<InlongStreamFieldInfo> streamFieldInfos = binlogSourceResponse.getFieldList();
         List<FieldInfo> fieldInfos = streamFieldInfos.stream()
-                .map(streamFieldInfo -> new FieldInfo(streamFieldInfo.getFieldName(), name,
-                        FieldInfoUtils.convertFieldFormat(streamFieldInfo.getFieldType(),
-                                streamFieldInfo.getFieldFormat()))).collect(Collectors.toList());
+                .map(streamFieldInfo -> FieldInfoUtils.parseStreamFieldInfo(streamFieldInfo, name))
+                .collect(Collectors.toList());
         String serverTimeZone = binlogSourceResponse.getServerTimezone();
         return new MySqlExtractNode(id,
                 name,
@@ -122,9 +125,8 @@ public class ExtractNodeUtils {
         String name = kafkaSourceResponse.getSourceName();
         List<InlongStreamFieldInfo> streamFieldInfos = kafkaSourceResponse.getFieldList();
         List<FieldInfo> fieldInfos = streamFieldInfos.stream()
-                .map(streamFieldInfo -> new FieldInfo(streamFieldInfo.getFieldName(), name,
-                        FieldInfoUtils.convertFieldFormat(streamFieldInfo.getFieldType(),
-                                streamFieldInfo.getFieldFormat()))).collect(Collectors.toList());
+                .map(streamFieldInfo -> FieldInfoUtils.parseStreamFieldInfo(streamFieldInfo, name))
+                .collect(Collectors.toList());
         String topic = kafkaSourceResponse.getTopic();
         String bootstrapServers = kafkaSourceResponse.getBootstrapServers();
         Format format = null;
