@@ -31,6 +31,7 @@ import org.apache.inlong.manager.common.pojo.transform.splitter.SplitterDefiniti
 import org.apache.inlong.manager.common.pojo.transform.splitter.SplitterDefinition.SplitRule;
 import org.apache.inlong.manager.common.util.Preconditions;
 import org.apache.inlong.manager.common.util.StreamParseUtils;
+import org.apache.inlong.sort.formats.common.FormatInfo;
 import org.apache.inlong.sort.protocol.FieldInfo;
 import org.apache.inlong.sort.protocol.transformation.ConstantParam;
 import org.apache.inlong.sort.protocol.transformation.FieldRelationShip;
@@ -61,8 +62,9 @@ public class FieldRelationShipUtils {
                 return createReplacerFieldRelationShips(fieldList, transformName, replacerDefinition, preNodes);
             case DE_DUPLICATION:
             case FILTER:
-            case JOINER:
                 return createFieldRelationShips(fieldList, transformName);
+            case JOINER:
+                return createJoinerFieldRelationShips(fieldList, transformName);
             default:
                 throw new UnsupportedOperationException(
                         String.format("Unsupported transformType=%s for Inlong", transformType));
@@ -81,6 +83,21 @@ public class FieldRelationShipUtils {
                 }).collect(Collectors.toList());
     }
 
+    private static List<FieldRelationShip> createJoinerFieldRelationShips(List<StreamField> fieldList,
+            String transformName) {
+        return fieldList.stream()
+                .map(streamFieldInfo -> {
+                    FormatInfo formatInfo = FieldInfoUtils.convertFieldFormat(
+                            streamFieldInfo.getFieldType().name(),
+                            streamFieldInfo.getFieldFormat());
+                    FieldInfo inputField = new FieldInfo(streamFieldInfo.getOriginFieldName(),
+                            streamFieldInfo.getOriginNodeName(), formatInfo);
+                    FieldInfo outputField = new FieldInfo(streamFieldInfo.getFieldName(),
+                            transformName, formatInfo);
+                    return new FieldRelationShip(inputField, outputField);
+                }).collect(Collectors.toList());
+    }
+
     private static List<FieldRelationShip> createSplitterFieldRelationShips(List<StreamField> fieldList,
             String transformName, SplitterDefinition splitterDefinition, String preNodes) {
         Preconditions.checkNotEmpty(preNodes, "PreNodes of splitter should not be null");
@@ -94,7 +111,7 @@ public class FieldRelationShipUtils {
                     return list1;
                 });
         List<StreamField> filteredFieldList = fieldList.stream()
-                .filter(streamFieldInfo -> splitFields.contains(streamFieldInfo.getFieldName()))
+                .filter(streamFieldInfo -> !splitFields.contains(streamFieldInfo.getFieldName()))
                 .collect(Collectors.toList());
         fieldRelationShips.addAll(createFieldRelationShips(filteredFieldList, transformName));
         return fieldRelationShips;
@@ -110,7 +127,7 @@ public class FieldRelationShipUtils {
                 .map(replaceRule -> parseReplaceRule(replaceRule, replaceFields, transformName, preNode))
                 .collect(Collectors.toList());
         List<StreamField> filteredFieldList = fieldList.stream()
-                .filter(streamFieldInfo -> replaceFields.contains(streamFieldInfo.getFieldName()))
+                .filter(streamFieldInfo -> !replaceFields.contains(streamFieldInfo.getFieldName()))
                 .collect(Collectors.toList());
         fieldRelationShips.addAll(createFieldRelationShips(filteredFieldList, transformName));
         return fieldRelationShips;
